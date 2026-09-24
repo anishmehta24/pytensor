@@ -32,13 +32,12 @@ def pytorch_typify(data, **kwargs):
 
 @pytorch_typify.register(np.ndarray)
 @pytorch_typify.register(torch.Tensor)
-def pytorch_typify_tensor(data, dtype=None, variable=None, **kwargs):
+def pytorch_typify_tensor(data, dtype=None, **kwargs):
     with warnings.catch_warnings():
-        if isinstance(variable, Constant):
-            # Constants are never written to, so sharing memory with a read-only array is fine
-            warnings.filterwarnings(
-                "ignore", "The given NumPy array is not writable", UserWarning
-            )
+        # The PyTorch backend never writes to its inputs or constants in place
+        warnings.filterwarnings(
+            "ignore", "The given NumPy array is not writable", UserWarning
+        )
         return torch.as_tensor(data, dtype=dtype)
 
 
