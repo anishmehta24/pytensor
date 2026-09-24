@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable, Iterable
 from functools import partial
 
@@ -377,6 +378,17 @@ def test_pytorch_link_references():
     f = function([x], out, mode="PYTORCH")
     f(torch.ones(3))
     assert "inner_fn" not in dir(m), "function call reference leaked"
+
+
+def test_read_only_constant_does_not_warn():
+    # https://github.com/pymc-devs/pytensor/issues/2365
+    x = vector("x")
+    # The gradient graph contains a constant backed by a read-only array
+    out = pt.grad((x**2).sum(), x)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        f = function([x], out, mode="PYTORCH")
+        np.testing.assert_allclose(f(np.ones(3)), 2)
 
 
 def test_pytorch_scipy():
