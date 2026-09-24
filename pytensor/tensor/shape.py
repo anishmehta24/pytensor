@@ -409,15 +409,21 @@ class SpecifyShape(COp):
                 f"Input `x` is {x.type.ndim}-dimensional and will never match a shape of length {len(shape)}."
             )
 
-        type_shape = [None] * x.ndim
+        type_shape = list(x.type.shape)
         for i, (xts, s) in enumerate(zip(x.type.shape, shape, strict=True)):
-            if xts is not None:
-                type_shape[i] = xts
-            elif not isinstance(s.type, NoneTypeT):
-                try:
-                    type_shape[i] = int(ptb.get_scalar_constant_value(s))
-                except NotScalarConstantError:
-                    pass
+            if isinstance(s.type, NoneTypeT):
+                continue
+            try:
+                s_val = int(ptb.get_scalar_constant_value(s))
+            except NotScalarConstantError:
+                continue
+            if xts is None:
+                type_shape[i] = s_val
+            elif xts != s_val:
+                raise ValueError(
+                    f"Input `x` has static shape {x.type.shape}, which does not match "
+                    f"the specified value {s_val} at dimension {i}."
+                )
 
         out_var = x.type.clone(shape=type_shape)()
 

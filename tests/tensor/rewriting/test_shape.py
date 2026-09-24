@@ -654,11 +654,9 @@ def test_useless_specify_shape():
     ret = local_useless_specify_shape.transform(None, out.owner)
     assert ret is None
 
-    # SpecifyShape is needed to raise mismatch between static and specified dim
-    out = ss(x, None, 5, 4)
-    assert isinstance(out.owner.op, SpecifyShape)
-    ret = local_useless_specify_shape.transform(None, out.owner)
-    assert ret is None
+    # A mismatch between static and specified dim is raised when building the node
+    with pytest.raises(ValueError, match="does not match"):
+        ss(x, None, 5, 4)
 
 
 @pytest.mark.parametrize(

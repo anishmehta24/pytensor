@@ -407,6 +407,13 @@ class TestSpecifyShape(utt.InferShapeTester):
         with pytest.raises(ValueError, match="must have fixed dimensions"):
             specify_shape(matrix(), vector(dtype="int32"))
 
+        x = tensor(shape=(None, 5, 3))
+        with pytest.raises(ValueError, match="does not match the specified value 4"):
+            _specify_shape(x, None, 5, 4)
+
+        with pytest.raises(ValueError, match="does not match the specified value 4"):
+            specify_shape(x, (None, 5, 4))
+
     def test_scalar_shapes(self):
         with pytest.raises(ValueError, match="will never match"):
             specify_shape(vector(), shape=())
@@ -589,7 +596,8 @@ class TestSpecifyShape(utt.InferShapeTester):
 
         assert specify_shape(x, (1, 2, 3)) is not x
         assert specify_shape(x, (None, None, 3)) is not x
-        assert specify_shape(x, (1, 3, None)) is not x
+        with pytest.raises(ValueError, match="does not match"):
+            specify_shape(x, (1, 3, None))
 
     def test_specify_shape_in_grad(self):
         x = matrix()
