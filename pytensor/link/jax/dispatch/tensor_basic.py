@@ -14,6 +14,7 @@ from pytensor.tensor.basic import (
     Eye,
     Join,
     MakeVector,
+    Nonzero,
     ScalarFromTensor,
     Split,
     TensorFromScalar,
@@ -30,6 +31,17 @@ An example of a graph that can be compiled to JAX:
 >>> import pytensor.tensor as pt
 >>> pt.arange(1, 10, 2)
 """
+
+
+NONZERO_ERROR = """JAX cannot JIT-compile `nonzero` (or `flatnonzero`/`nonzero_values`):
+the number of nonzero entries, and so the output shape, depends on the input values.
+Consider working with a boolean mask instead, e.g. `pt.switch(x != 0, x, 0)`.
+"""
+
+
+@jax_funcify.register(Nonzero)
+def jax_funcify_Nonzero(op, **kwargs):
+    raise NotImplementedError(NONZERO_ERROR)
 
 
 @jax_funcify.register(AllocEmpty)
