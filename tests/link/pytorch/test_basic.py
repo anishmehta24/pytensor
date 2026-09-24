@@ -379,6 +379,16 @@ def test_pytorch_link_references():
     assert "inner_fn" not in dir(m), "function call reference leaked"
 
 
+@pytest.mark.filterwarnings("error")
+def test_read_only_constant_does_not_warn():
+    # https://github.com/pymc-devs/pytensor/issues/2365
+    x = vector("x")
+    # The gradient graph contains a constant backed by a read-only array
+    out = pt.grad((x**2).sum(), x)
+    f = function([x], out, mode="PYTORCH")
+    np.testing.assert_allclose(f(np.ones(3)), 2)
+
+
 def test_pytorch_scipy():
     x = vector("a", shape=(3,))
     out = expit(x)
