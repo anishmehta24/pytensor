@@ -33,9 +33,9 @@ An example of a graph that can be compiled to JAX:
 """
 
 
-NONZERO_ERROR = """JAX cannot JIT-compile `nonzero` (or `flatnonzero`/`nonzero_values`):
-the number of nonzero entries, and so the output shape, depends on the input values.
-Consider working with a boolean mask instead, e.g. `pt.switch(x != 0, x, 0)`.
+NONZERO_ERROR = """JAX does not support `nonzero` (or `flatnonzero`/`nonzero_values`),
+because the number of nonzero entries, and so the output shape, depends on the input values.
+The graph that you defined thus cannot be JIT-compiled by JAX.
 """
 
 

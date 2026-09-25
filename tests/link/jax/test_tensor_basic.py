@@ -96,7 +96,7 @@ def test_nonzero_nonconcrete():
     x_test_value = np.array([0.0, 1.0, 2.0], dtype=config.floatX)
 
     for out in (ptb.nonzero(x)[0], ptb.flatnonzero(x), ptb.nonzero_values(x)):
-        with pytest.raises(NotImplementedError, match="cannot JIT-compile `nonzero`"):
+        with pytest.raises(NotImplementedError, match="JAX does not support `nonzero`"):
             compare_jax_and_py([x], [out], [x_test_value])
 
 
