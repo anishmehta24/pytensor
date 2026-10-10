@@ -365,11 +365,53 @@ class FixedOpCAReduce(CAReduce):
 
 
 class NonZeroDimsCAReduce(FixedOpCAReduce):
+    """A reduction that raises on a zero-size reduced axis, like NumPy's ``max``.
+
+    With ``initial=True`` an empty reduction returns the identity of the scalar
+    ``Op`` (``-inf`` for ``maximum``, ``inf`` for ``minimum``) instead of raising,
+    like NumPy's ``initial``. For integer and boolean inputs the lowest/highest
+    value of the dtype is used.
+    """
+
+    __props__ = (*FixedOpCAReduce.__props__, "initial")
+
+    def __init__(self, scalar_op, axis=None, initial=False, **kwargs):
+        self.initial = bool(initial)
+        super().__init__(scalar_op, axis=axis, **kwargs)
+
+    def __str__(self):
+        if not self.initial:
+            return super().__str__()
+        return f"{type(self).__name__}{{{self._axis_str()}, initial}}"
+
+    def initial_value(self, dtype):
+        """The identity as a value of `dtype` (its bounds for ints and bools), or None."""
+        if not self.initial:
+            return None
+        identity = self.scalar_op.identity
+        dtype = np.dtype(dtype)
+        if dtype.kind == "f":
+            return identity
+        if dtype.kind == "b":
+            return identity > 0
+        info = np.iinfo(dtype)
+        return info.max if identity > 0 else info.min
+
+    def perform(self, node, inp, out):
+        if not self.initial:
+            return super().perform(node, inp, out)
+        [x] = inp
+        dtype = node.outputs[0].type.dtype
+        out[0][0] = np.asarray(
+            self.ufunc.reduce(x, axis=self.axis, initial=self.initial_value(dtype)),
+            dtype=dtype,
+        )
+
     def _c_all(self, node, name, input_names, output_names, sub):
         setup, alloc, loop, cast = super()._c_all(
             node, name, input_names, output_names, sub
         )
-        if getattr(self, "initial", False):
+        if self.initial:
             # Empty reductions return the scalar_op identity
             return setup, alloc, loop, cast
 
@@ -414,51 +456,12 @@ class MaxAndMinCAReduce(NonZeroDimsCAReduce):
 
     Subclasses only need to bind the appropriate scalar ``Op`` (``maximum`` or
     ``minimum``) in their ``__init__`` and set ``nfunc_spec``.
-
-    With ``initial=True`` an empty reduction returns the identity of the scalar
-    ``Op`` (``-inf`` for ``Max``, ``inf`` for ``Min``) instead of raising, like
-    NumPy's ``initial``. For integer and boolean inputs the lowest/highest value of
-    the dtype is used.
     """
-
-    __props__ = (*NonZeroDimsCAReduce.__props__, "initial")
-
-    def __init__(self, scalar_op, axis, initial=False):
-        self.initial = bool(initial)
-        super().__init__(scalar_op, axis)
 
     def clone(self, **kwargs):
         axis = kwargs.get("axis", self.axis)
         initial = kwargs.get("initial", self.initial)
         return type(self)(axis=axis, initial=initial)
-
-    def __str__(self):
-        if not self.initial:
-            return super().__str__()
-        return f"{type(self).__name__}{{{self._axis_str()}, initial}}"
-
-    def initial_value(self, dtype):
-        """The identity as a value of `dtype` (its bounds for ints and bools), or None."""
-        if not self.initial:
-            return None
-        identity = self.scalar_op.identity
-        dtype = np.dtype(dtype)
-        if dtype.kind == "f":
-            return identity
-        if dtype.kind == "b":
-            return identity > 0
-        info = np.iinfo(dtype)
-        return info.max if identity > 0 else info.min
-
-    def perform(self, node, inp, out):
-        if not self.initial:
-            return super().perform(node, inp, out)
-        [x] = inp
-        dtype = node.outputs[0].type.dtype
-        out[0][0] = np.asarray(
-            self.ufunc.reduce(x, axis=self.axis, initial=self.initial_value(dtype)),
-            dtype=dtype,
-        )
 
     def pullback(self, inputs, outputs, output_grads):
         # The strict-sense mathematical gradient of a maximum/minimum reduction

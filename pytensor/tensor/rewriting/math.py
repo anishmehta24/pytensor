@@ -2308,28 +2308,23 @@ def local_careduce_of_alloc(fgraph, node):
     # them into a multiplication by their size, ``Prod``/``ProdWithoutZeros``
     # into a power; idempotent reductions (max/min/all/any) are unaffected, as
     # repeating a value doesn't change its maximum, minimum, or truth.
-    if isinstance(node.op, Sum | Prod | ProdWithoutZeros):
-        size_shapes = [shapes[a] for a in axis if a < offset or value_bcast[a - offset]]
-        if size_shapes:
-            size = variadic_mul(*size_shapes)
-            if value.dtype in ("float16", "float32"):
-                # Avoid a float64 upcast from the int64 shapes (or a float16
-                # downcast); either would be amplified by the mul/pow below.
-                size = size.astype("float32")
-            value = value * size if isinstance(node.op, Sum) else value**size
+    size_shapes = [shapes[a] for a in axis if a < offset or value_bcast[a - offset]]
+    if size_shapes and isinstance(node.op, Sum | Prod | ProdWithoutZeros):
+        size = variadic_mul(*size_shapes)
+        if value.dtype in ("float16", "float32"):
+            # Avoid a float64 upcast from the int64 shapes (or a float16
+            # downcast); either would be amplified by the mul/pow below.
+            size = size.astype("float32")
+        value = value * size if isinstance(node.op, Sum) else value**size
 
     # With `initial`, a broadcast axis that is empty at runtime makes the result `initial`
-    if getattr(node.op, "initial", False):
-        broadcast_shapes = [
-            shapes[a] for a in axis if a < offset or value_bcast[a - offset]
-        ]
-        if broadcast_shapes:
-            dtype = node.outputs[0].dtype
-            value = switch(
-                eq(variadic_mul(*broadcast_shapes), 0),
-                np.asarray(node.op.initial_value(dtype), dtype=dtype),
-                value,
-            )
+    if size_shapes and getattr(node.op, "initial", False):
+        dtype = node.outputs[0].dtype
+        value = switch(
+            eq(variadic_mul(*size_shapes), 0),
+            np.asarray(node.op.initial_value(dtype), dtype=dtype),
+            value,
+        )
 
     # The reduction may change the dtype; a single elemwise has no accumulation
     # error, so ignore acc_dtype and just cast to the reduction's output dtype.
